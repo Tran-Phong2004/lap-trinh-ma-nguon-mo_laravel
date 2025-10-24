@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role_id'
     ];
 
     /**
@@ -46,10 +47,11 @@ class User extends Authenticatable
         ];
     }
 
-     // Quan hệ với bảng role (N-N)
-    public function roles()
+    // Quan hệ với bảng role (N-N)
+    // Quan hệ với Role
+    public function role()
     {
-        return $this->belongsToMany(Role::class, 'user_roles');
+        return $this->belongsTo(Role::class);
     }
 
     // Quan hệ với exam_sessions: 1 User - N ExamSession
@@ -61,5 +63,48 @@ class User extends Authenticatable
     public function examAccessControls()
     {
         return $this->hasMany(ExamAccessControl::class, 'student_id');
+    }
+
+     // Kiểm tra role theo tên
+    public function hasRole($roleName)
+    {
+        return $this->role && $this->role->name === $roleName;
+    }
+
+    // Kiểm tra nhiều role
+    public function hasAnyRole($roles)
+    {
+        if (is_array($roles)) {
+            return $this->role && in_array($this->role->name, $roles);
+        }
+        return $this->hasRole($roles);
+    }
+
+    // Kiểm tra role cụ thể
+    public function isAdmin()
+    {
+        return $this->hasRole('admin');
+    }
+
+    public function isTeacher()
+    {
+        return $this->hasRole('teacher');
+    }
+
+    public function isStudent()
+    {
+        return $this->hasRole('student');
+    }
+
+    // Lấy tên role
+    public function getRoleName()
+    {
+        return $this->role ? $this->role->name : null;
+    }
+
+    // Accessor để dễ truy cập trong view
+    public function getRoleNameAttribute()
+    {
+        return $this->getRoleName();
     }
 }

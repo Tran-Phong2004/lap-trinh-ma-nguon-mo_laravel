@@ -55,9 +55,9 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('question_types');
-        Schema::dropIfExists('questions');
-        Schema::dropIfExists('answer_options');
         Schema::dropIfExists('exam_question');
+        Schema::dropIfExists('answer_options');
+        Schema::dropIfExists('questions');
+        Schema::dropIfExists('question_types'); 
     }
 };

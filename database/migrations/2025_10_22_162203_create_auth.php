@@ -15,15 +15,10 @@ return new class extends Migration {
             $table->string('name', 100)->unique();
         });
 
-        Schema::create('user_roles', function (Blueprint $table) {
-            $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('role_id');
-
-            $table->primary(['user_id', 'role_id']);
-
-            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
-            $table->foreign('role_id')->references('id')->on('roles')->cascadeOnDelete();
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreign('role_id', 'fk_users_role_id')->references('id')->on('roles');
         });
+
     }
 
     /**
@@ -31,7 +26,9 @@ return new class extends Migration {
      */
     public function down(): void
     {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropForeign('fk_users_role_id');
+        });
         Schema::dropIfExists('roles');
-        Schema::dropIfExists('user_roles');
     }
 };

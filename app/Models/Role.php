@@ -9,8 +9,8 @@ class Role extends Model
     public $timestamps = false;
     protected $fillable = ['name'];
 
-    public function users()
+     public function users()
     {
-        return $this->belongsToMany(User::class, 'user_roles');
+        return $this->hasMany(User::class);
     }
 }
