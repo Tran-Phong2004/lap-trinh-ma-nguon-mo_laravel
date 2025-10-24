@@ -45,4 +45,21 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+     // Quan hệ với bảng role (N-N)
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class, 'user_roles');
+    }
+
+    // Quan hệ với exam_sessions: 1 User - N ExamSession
+    public function examSessions()
+    {
+        return $this->hasMany(ExamSession::class, 'student_id');
+    }
+
+    public function examAccessControls()
+    {
+        return $this->hasMany(ExamAccessControl::class, 'student_id');
+    }
 }
