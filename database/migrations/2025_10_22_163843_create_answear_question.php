@@ -21,9 +21,10 @@ return new class extends Migration {
             $table->unsignedInteger('difficulty_level_id')->nullable();
             $table->longText('question_text');
             $table->text('explanation')->nullable(); // giải thích đáp án
-            $table->string('image_path', 255)->nullable(); // nếu có ảnh đính kèm
+            $table->string('image', 255)->nullable(); // nếu có ảnh đính kèm
             $table->boolean('is_active')->default(1);
-
+            $table->integer('order')->default(0);
+            
             $table->foreign('question_type_id')->references('id')->on('question_types');
         });
 

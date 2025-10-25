@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Exam extends Model
 {
@@ -16,13 +18,21 @@ class Exam extends Model
         'is_active'
     ];
 
-    public function sessions()
+    protected $casts = [
+        'start_time' => 'datetime',
+        'end_time' => 'datetime',
+        'is_active' => 'boolean'
+    ];
+
+    public function questions(): BelongsToMany
     {
-        return $this->hasMany(ExamSession::class);
+        return $this->belongsToMany(Question::class, 'exam_question')
+            ->withPivot('order')
+            ->orderBy('exam_question.order');
     }
 
-    public function questions()
+    public function sessions(): HasMany
     {
-        return $this->belongsToMany(Question::class, 'exam_question')->withPivot('order');
+        return $this->hasMany(ExamSession::class);
     }
 }

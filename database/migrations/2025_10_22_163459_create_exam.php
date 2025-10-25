@@ -15,20 +15,20 @@ return new class extends Migration {
             $table->string('exam_name', 255);
             $table->text('description')->nullable();
             $table->integer('duration_minutes'); // thời gian thi (phút)
-            $table->dateTime('start_time')->nullable();
-            $table->dateTime('end_time')->nullable();
+            $table->dateTime('start_time');
+            $table->dateTime('end_time');
             $table->boolean('is_active')->default(1);
         });
 
         Schema::create('exam_sessions', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->unsignedBigInteger('exam_id');
-            $table->unsignedBigInteger('student_id');
+            $table->unsignedBigInteger('student_id')->nullable();
             $table->string('session_name', 255)->nullable();
-            $table->dateTime('start_time');
-            $table->dateTime('end_time');
             $table->integer('max_attempts')->default(1); // số lần được thi
-
+            $table->string('status', 255)->nullable();
+            $table->timestamps();
+            
             $table->foreign('student_id')->references('id')->on('users')->cascadeOnDelete();
             $table->foreign('exam_id')->references('id')->on('exams')->cascadeOnDelete();
         });

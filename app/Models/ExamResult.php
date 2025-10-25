@@ -15,6 +15,11 @@ class ExamResult extends Model
         'submitted_at'
     ];
 
+    protected $casts = [
+        'submitted_at' => 'datetime',
+        'score' => 'float',
+    ];
+
     public function examSession()
     {
         return $this->belongsTo(ExamSession::class);

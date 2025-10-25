@@ -33,6 +33,9 @@
             color: white;
             padding: 30px 0;
             position: fixed;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; 
             height: 100vh;
             overflow-y: auto;
         }
@@ -54,6 +57,28 @@
 
         .sidebar-menu {
             padding: 30px 0;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .sidebar-logout {
+            margin-top: auto; 
+            padding: 15px 30px;
+        }
+        .sidebar-logout button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .sidebar-logout button:hover {
+            background: rgba(255,255,255,0.1);
         }
 
         .menu-item {
@@ -444,27 +469,32 @@
                 <p>Web Thi Tiếng Anh</p>
             </div>
             <nav class="sidebar-menu">
-                <a href="#" class="menu-item">
+                <!-- <a href="#" class="menu-item">
                     <i class="fas fa-home"></i>
                     <span>Dashboard</span>
-                </a>
-                <a href="#" class="menu-item active">
+                </a> -->
+                <a href="{{ route('admin.users.index') }}" class="menu-item active">
                     <i class="fas fa-users"></i>
                     <span>Quản lý người dùng</span>
                 </a>
-                <a href="#" class="menu-item">
+                <a href="{{ route('admin.exams.index') }}" class="menu-item">
                     <i class="fas fa-book"></i>
                     <span>Quản lý đề thi</span>
                 </a>
-                <a href="#" class="menu-item">
+                <a href="{{ route('admin.reports.index') }}" class="menu-item">
                     <i class="fas fa-chart-bar"></i>
                     <span>Báo cáo</span>
                 </a>
-                <a href="#" class="menu-item">
-                    <i class="fas fa-cog"></i>
-                    <span>Cài đặt</span>
-                </a>
             </nav>
+            <div class="sidebar-logout">
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Đăng xuất</span>
+                    </button>
+                </form>
+            </div>
         </aside>
 
         <!-- Main Content -->

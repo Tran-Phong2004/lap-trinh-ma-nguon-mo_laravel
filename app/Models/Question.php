@@ -3,14 +3,24 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Storage;
 
 class Question extends Model
 {
-      public $timestamps = false;
+    public $timestamps = false;
     protected $fillable = [
-        'question_type_id', 'difficulty_level_id',
-        'question_text', 'explanation', 'image_path', 'is_active'
+        'question_type_id',
+        'difficulty_level_id',
+        'question_text',
+        'explanation',
+        'image',
+        'is_active'
     ];
+
+    public function getImageUrlAttribute()
+    {
+        return $this->image ? Storage::url($this->image) : null;
+    }
 
     public function type()
     {

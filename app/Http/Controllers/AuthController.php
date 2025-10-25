@@ -9,6 +9,13 @@ class AuthController extends Controller
 {
     public function showLoginForm()
     {
+        if (Auth::check()) {
+            if (Auth::user()->isAdmin()) {
+                return redirect('/admin');
+            } elseif (Auth::user()->isStudent()) {
+                return redirect()->route('student.exam-sessions');
+            }
+        }
         return view('auth.login');
     }
 
@@ -24,11 +31,13 @@ class AuthController extends Controller
                 'email' => 'Email hoặc mật khẩu không đúng',
             ]);
         }
+
         $request->session()->regenerate();
-        if(Auth::user()->isAdmin()) {
+        if (Auth::user()->isAdmin()) {
             return redirect('/admin');
         }
-        return redirect()->intended('/home');
+        // Redirect student đến trang chọn phiên thi
+        return redirect()->route('student.exam-sessions');
     }
 
     public function logout(Request $request)
@@ -36,6 +45,6 @@ class AuthController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        return redirect('/login');
+        return redirect('/');
     }
 }

@@ -6,15 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class ExamSession extends Model
 {
-    public $timestamps = false;
     protected $fillable = [
         'exam_id',
         'student_id',
         'session_name',
-        'start_time',
-        'end_time',
+        'status',
+        // 'start_time',
+        // 'end_time',
         'max_attempts'
     ];
+
+    // protected $casts = [
+    //     'start_time' => 'datetime',
+    //     'end_time' => 'datetime',
+    // ];
 
     public function exam()
     {

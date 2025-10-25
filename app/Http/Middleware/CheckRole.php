@@ -10,7 +10,7 @@ class CheckRole
     public function handle(Request $request, Closure $next, ...$roles)
     {
         if (!auth()->check()) {
-            return redirect()->route('login');
+            return redirect()->route('/');
         }
 
         $user = auth()->user();
