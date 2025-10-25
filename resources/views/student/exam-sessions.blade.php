@@ -156,6 +156,20 @@
         .empty-state p {
             color: #666;
         }
+        .change-password-btn {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+        .change-password-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
@@ -164,6 +178,7 @@
             <h1>📚 Phiên Thi Của Tôi</h1>
             <div class="user-info">
                 <span>Xin chào, <strong>{{ Auth::user()->name }}</strong></span>
+                <a href="{{ route('change-password.form') }}" class="change-password-btn">🔐 Đổi mật khẩu</a>
                 <form action="{{ route('logout') }}" method="POST">
                     @csrf
                     <button type="submit" class="logout-btn">Đăng xuất</button>

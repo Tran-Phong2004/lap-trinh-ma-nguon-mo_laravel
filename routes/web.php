@@ -13,7 +13,6 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-
 Route::middleware(['auth', 'role:admin,teacher'])->group(function () {
     // Group route cho admin
     Route::prefix('admin')->name('admin.')->group(function () {
@@ -59,6 +58,13 @@ Route::middleware(['auth'])->prefix('student')->name('student.')->group(function
 
     Route::post('/exam/{sessionId}/save-answer', [StudentExamController::class, 'saveAnswer'])->name('save-answer');
     Route::get('/exam/{sessionId}/review', [StudentExamController::class, 'reviewExam'])->name('review-exam');
+});
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/change-password', [AuthController::class, 'showChangePasswordForm'])
+        ->name('change-password.form');
+    Route::post('/change-password', [AuthController::class, 'changePassword'])
+        ->name('change-password');
 });
 
 
