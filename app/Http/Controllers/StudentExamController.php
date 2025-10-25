@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Exam;
 use App\Models\ExamSession;
+use App\Models\StudentAnswer;
+use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -96,10 +98,11 @@ class StudentExamController extends Controller
         if ($attemptCount >= $examSession->max_attempts) {
             return back()->with('error', 'Bạn đã hết lượt thi');
         }
-         $examSession->update([
-            'status' => 'in_progress'
-         ]);
-
+        $examSession->update([
+            'status' => 'in_progress',
+        ]);
+        // Xóa các câu trả lời cũ nếu có (trường hợp làm lại)
+        StudentAnswer::where('exam_session_id', $sessionId)->delete();
         // Chuyển đến trang làm bài
         return redirect()->route('student.take-exam', ['sessionId' => $sessionId]);
     }
@@ -109,7 +112,7 @@ class StudentExamController extends Controller
     {
         $studentId = Auth::id();
 
-        $examSession = ExamSession::with(['exam.questions.answerOptions'])
+        $examSession = ExamSession::with(['exam.questions.answerOptions', 'studentAnswers'])
             ->where('id', $sessionId)
             ->where('student_id', $studentId)
             ->firstOrFail();
@@ -124,7 +127,50 @@ class StudentExamController extends Controller
             ])
             ->orderBy('exam_question.order')
             ->get();
-        return view('student.take-exam', compact('examSession', 'exam', 'questions'));
+
+        // Lấy câu trả lời đã lưu (nếu có)
+        $savedAnswers = $examSession->studentAnswers->pluck('selected_answer_id', 'question_id')->toArray();
+        return view('student.take-exam', compact('examSession', 'exam', 'questions', 'savedAnswers'));
+    }
+
+    // Lưu câu trả lời tạm thời (auto-save)
+    public function saveAnswer(Request $request, $sessionId)
+    {
+        $request->validate([
+            'question_id' => 'required|exists:questions,id',
+            'answer_id' => 'nullable|exists:answer_options,id'
+        ]);
+
+        $studentId = Auth::id();
+        $examSession = ExamSession::where('id', $sessionId)
+            ->where('student_id', $studentId)
+            ->firstOrFail();
+
+        // Kiểm tra xem câu trả lời có đúng không
+        $isCorrect = false;
+        if ($request->answer_id) {
+            $isCorrect = DB::table('answer_options')
+                ->where('id', $request->answer_id)
+                ->where('is_correct', 1)
+                ->exists();
+        }
+
+        // Lưu hoặc cập nhật câu trả lời
+        StudentAnswer::updateOrCreate(
+            [
+                'exam_session_id' => $sessionId,
+                'question_id' => $request->question_id
+            ],
+            [
+                'selected_answer_id' => $request->answer_id,
+                'is_correct' => $isCorrect
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã lưu câu trả lời'
+        ]);
     }
 
     // Submit bài thi
@@ -139,44 +185,69 @@ class StudentExamController extends Controller
 
         $answers = $request->input('answers', []);
 
-        $correctCount = 0;
-        $wrongCount = 0;
-        $totalQuestions = $examSession->exam->questions->count();
+        DB::beginTransaction();
+        try {
+            $correctCount = 0;
+            $wrongCount = 0;
+            $totalQuestions = $examSession->exam->questions->count();
 
-        // Chấm điểm
-        foreach ($examSession->exam->questions as $question) {
-            $selectedAnswerId = $answers[$question->id] ?? null;
+            // Xóa các câu trả lời cũ (nếu có)
+            StudentAnswer::where('exam_session_id', $sessionId)->delete();
 
-            if ($selectedAnswerId) {
-                $isCorrect = $question->answerOptions()
-                    ->where('id', $selectedAnswerId)
-                    ->where('is_correct', 1)
-                    ->exists();
+            // Lưu câu trả lời và chấm điểm
+            foreach ($examSession->exam->questions as $question) {
+                $selectedAnswerId = $answers[$question->id] ?? null;
+                $isCorrect = false;
 
-                if ($isCorrect) {
-                    $correctCount++;
+                if ($selectedAnswerId) {
+                    $isCorrect = $question->answerOptions()
+                        ->where('id', $selectedAnswerId)
+                        ->where('is_correct', 1)
+                        ->exists();
+
+                    if ($isCorrect) {
+                        $correctCount++;
+                    } else {
+                        $wrongCount++;
+                    }
                 } else {
                     $wrongCount++;
                 }
-            } else {
-                $wrongCount++;
+
+                // Lưu câu trả lời vào bảng student_answers
+                StudentAnswer::create([
+                    'exam_session_id' => $sessionId,
+                    'question_id' => $question->id,
+                    'selected_answer_id' => $selectedAnswerId,
+                    'is_correct' => $isCorrect
+                ]);
             }
+
+            // Tính điểm
+            $score = $totalQuestions > 0 ? ($correctCount / $totalQuestions) * 10 : 0;
+
+            // Cập nhật trạng thái session
+            $examSession->update([
+                'status' => 'completed'
+            ]);
+
+            // Lưu kết quả
+            $examSession->results()->create([
+                'score' => round($score, 2),
+                'correct_answers' => $correctCount,
+                'wrong_answers' => $wrongCount,
+                'submitted_at' => Carbon::now(),
+            ]);
+
+            DB::commit();
+
+            return redirect()->route('student.exam-result', ['sessionId' => $sessionId])
+                ->with('success', 'Nộp bài thành công!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Có lỗi xảy ra khi nộp bài: ' . $e->getMessage());
         }
-
-        $score = $totalQuestions > 0 ? ($correctCount / $totalQuestions) * 100 : 0;
-        $examSession->update([
-            'status' => 'completed'
-        ]);
-        // Lưu kết quả
-        $examSession->results()->create([
-            'score' => $score,
-            'correct_answers' => $correctCount,
-            'wrong_answers' => $wrongCount,
-            'submitted_at' => Carbon::now(),
-        ]);
-
-        return redirect()->route('student.exam-result', ['sessionId' => $sessionId])
-            ->with('success', 'Nộp bài thành công!');
     }
 
     // Xem kết quả
@@ -191,5 +262,38 @@ class StudentExamController extends Controller
 
         $latestResult = $examSession->results()->orderByDesc('submitted_at')->first();
         return view('student.exam-result', compact('examSession', 'latestResult'));
+    }
+
+    // Xem lại bài làm
+    public function reviewExam($sessionId)
+    {
+        $studentId = Auth::id();
+
+        $examSession = ExamSession::with([
+            'exam.questions' => function ($query) {
+                $query->orderBy('exam_question.order');
+            },
+            'exam.questions.answerOptions' => function ($query) {
+                $query->orderBy('order');
+            },
+            'exam.questions.type',
+            'studentAnswers.selectedAnswer',
+            'results'
+        ])
+            ->where('id', $sessionId)
+            ->where('student_id', $studentId)
+            ->firstOrFail();
+
+        // Kiểm tra xem đã hoàn thành bài thi chưa
+        if ($examSession->status !== 'completed') {
+            return redirect()->route('student.exam-sessions')
+                ->with('error', 'Bạn chưa hoàn thành bài thi này');
+        }
+
+        // Tạo map câu trả lời của học sinh theo question_id
+        $answersMap = $examSession->studentAnswers->keyBy('question_id');
+        $latestResult = $examSession->results()->orderByDesc('submitted_at')->first();
+
+        return view('student.review-exam', compact('examSession', 'answersMap', 'latestResult'));
     }
 }

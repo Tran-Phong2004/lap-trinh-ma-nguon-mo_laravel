@@ -35,7 +35,7 @@
             position: fixed;
             display: flex;
             flex-direction: column;
-            justify-content: flex-start; 
+            justify-content: flex-start; /* mặc định */
             height: 100vh;
             overflow-y: auto;
         }

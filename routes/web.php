@@ -56,6 +56,9 @@ Route::middleware(['auth'])->prefix('student')->name('student.')->group(function
     Route::get('/exam/{sessionId}/take', [StudentExamController::class, 'takeExam'])->name('take-exam');
     Route::post('/exam/{sessionId}/submit', [StudentExamController::class, 'submitExam'])->name('submit-exam');
     Route::get('/exam/{sessionId}/result', [StudentExamController::class, 'examResult'])->name('exam-result');
+
+    Route::post('/exam/{sessionId}/save-answer', [StudentExamController::class, 'saveAnswer'])->name('save-answer');
+    Route::get('/exam/{sessionId}/review', [StudentExamController::class, 'reviewExam'])->name('review-exam');
 });
 
 

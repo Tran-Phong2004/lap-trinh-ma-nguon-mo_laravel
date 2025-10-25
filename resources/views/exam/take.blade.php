@@ -213,13 +213,6 @@
                 renderPartNavigation();
             }
 
-            // Prevent page reload
-            window.addEventListener('beforeunload', function (e) {
-                e.preventDefault();
-                e.returnValue = '';
-                return '';
-            });
-
             // Audio events
             const audio = document.getElementById('partAudio');
             audio.addEventListener('timeupdate', () => {
@@ -818,9 +811,6 @@
             return skillParts.reduce((sum, part) => sum + part.questions.length, 0);
         }
 
-        /**
- * Submit exam với form (MVC pattern)
- */
         async function submitExam(isLogout) {
             if (timerInterval) {
                 clearInterval(timerInterval);

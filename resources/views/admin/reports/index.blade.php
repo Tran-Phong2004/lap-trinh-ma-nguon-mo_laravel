@@ -47,7 +47,28 @@
 
         .sidebar-menu {
             padding: 30px 0;
+            display: flex;
+            flex-direction: column;
             flex-grow: 1;
+        }
+
+        .sidebar-logout {
+            margin-top: auto; /* đẩy xuống cuối */
+            padding: 15px 30px;
+        }
+        .sidebar-logout button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .sidebar-logout button:hover {
+            background: rgba(255,255,255,0.1);
         }
 
         .menu-item {
@@ -326,6 +347,15 @@
                     <span>Báo cáo</span>
                 </a>
             </nav>
+            <div class="sidebar-logout">
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Đăng xuất</span>
+                    </button>
+                </form>
+            </div>
         </aside>
 
         <main class="main-content">
@@ -380,11 +410,11 @@
             <div class="content-card">
                 <div class="card-header">
                     <h2>Danh sách kết quả</h2>
-                    <div>
+                    <!-- <div>
                         <button class="btn btn-success" onclick="exportReport()">
                             <i class="fas fa-file-excel"></i> Xuất Excel
                         </button>
-                    </div>
+                    </div> -->
                 </div>
 
                 <div class="filter-section">
@@ -453,7 +483,7 @@
                                 <th>Điểm số</th>
                                 <th>Số câu đúng/sai</th>
                                 <th>Trạng thái</th>
-                                <th>Thao tác</th>
+                                <!-- <th>Thao tác</th> -->
                             </tr>
                         </thead>
                         <tbody>
@@ -486,7 +516,7 @@
                                                 $scoreClass = $score >= 8 ? 'excellent' : ($score >= 6.5 ? 'good' : ($score >= 5 ? 'average' : 'poor'));
                                             @endphp
                                             <span class="score-badge score-{{ $scoreClass }}">
-                                                {{ number_format($score, 1) }}/100
+                                                {{ number_format($score, 1) }}/10
                                             </span>
                                         @else
                                             <span style="color: #6b7280;">Chưa có điểm</span>
@@ -517,14 +547,14 @@
                                             {{ $statusMap[$session->status] ?? $session->status }}
                                         </span>
                                     </td>
-                                    <td>
+                                    <!-- <td>
                                         <div class="action-buttons">
                                             <a href="{{ route('admin.reports.show', $session->id) }}" 
                                                class="btn-icon btn-info" title="Xem chi tiết">
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                         </div>
-                                    </td>
+                                    </td> -->
                                 </tr>
                             @empty
                                 <tr>
@@ -547,7 +577,6 @@
 
     <script>
         function exportReport() {
-            // Implement export functionality
             alert('Chức năng xuất Excel đang được phát triển');
         }
     </script>
