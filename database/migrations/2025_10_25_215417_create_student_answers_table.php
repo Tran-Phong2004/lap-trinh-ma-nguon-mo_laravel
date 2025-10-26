@@ -16,6 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('exam_session_id');
             $table->unsignedBigInteger('question_id');
             $table->unsignedBigInteger('selected_answer_id')->nullable();
+            $table->json('selected_answer_ids')->nullable(); // Thêm cho multiple_answer
             $table->text('text_answer')->nullable(); // Cho câu hỏi tự luận
             $table->boolean('is_correct')->default(0);
             $table->timestamps();

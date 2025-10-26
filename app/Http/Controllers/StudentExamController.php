@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Exam;
 use App\Models\ExamSession;
 use App\Models\StudentAnswer;
+use App\Models\Question;
 use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -112,7 +113,7 @@ class StudentExamController extends Controller
     {
         $studentId = Auth::id();
 
-        $examSession = ExamSession::with(['exam.questions.answerOptions', 'studentAnswers'])
+        $examSession = ExamSession::with(['exam.questions.answerOptions', 'exam.questions.type', 'studentAnswers'])
             ->where('id', $sessionId)
             ->where('student_id', $studentId)
             ->firstOrFail();
@@ -121,6 +122,7 @@ class StudentExamController extends Controller
 
         $questions = $exam->questions()
             ->with([
+                'type', // Thêm type
                 'answerOptions' => function ($query) {
                     $query->orderBy('order');
                 }
@@ -128,43 +130,110 @@ class StudentExamController extends Controller
             ->orderBy('exam_question.order')
             ->get();
 
-        // Lấy câu trả lời đã lưu (nếu có)
-        $savedAnswers = $examSession->studentAnswers->pluck('selected_answer_id', 'question_id')->toArray();
+        // Xử lý savedAnswers cho tất cả loại câu hỏi
+        $savedAnswers = [];
+        foreach ($examSession->studentAnswers as $answer) {
+            $question = $questions->firstWhere('id', $answer->question_id);
+            if (!$question)
+                continue;
+
+            $questionType = $question->type->name;
+
+            if ($questionType === 'multiple_choice') {
+                $savedAnswers[$answer->question_id] = $answer->selected_answer_id;
+            } elseif ($questionType === 'multiple_answer') {
+                $savedAnswers[$answer->question_id] = $answer->selected_answer_ids ?? [];
+            } elseif ($questionType === 'fill_blank') {
+                $savedAnswers[$answer->question_id] = $answer->text_answer ?? '';
+            }
+        }
+
         return view('student.take-exam', compact('examSession', 'exam', 'questions', 'savedAnswers'));
     }
 
     // Lưu câu trả lời tạm thời (auto-save)
     public function saveAnswer(Request $request, $sessionId)
     {
-        $request->validate([
-            'question_id' => 'required|exists:questions,id',
-            'answer_id' => 'nullable|exists:answer_options,id'
-        ]);
-
         $studentId = Auth::id();
         $examSession = ExamSession::where('id', $sessionId)
             ->where('student_id', $studentId)
             ->firstOrFail();
 
-        // Kiểm tra xem câu trả lời có đúng không
+        $questionId = $request->input('question_id');
+        $questionType = $request->input('question_type');
+
+        // Lấy thông tin câu hỏi
+        $question = Question::with('type', 'answerOptions')->findOrFail($questionId);
+
         $isCorrect = false;
-        if ($request->answer_id) {
-            $isCorrect = DB::table('answer_options')
-                ->where('id', $request->answer_id)
-                ->where('is_correct', 1)
-                ->exists();
+        $dataToSave = [
+            'exam_session_id' => $sessionId,
+            'question_id' => $questionId,
+        ];
+
+        switch ($questionType) {
+            case 'multiple_choice':
+                $answerId = $request->input('answer_id');
+
+                if ($answerId) {
+                    $isCorrect = $question->answerOptions()
+                        ->where('id', $answerId)
+                        ->where('is_correct', 1)
+                        ->exists();
+                }
+
+                $dataToSave['selected_answer_id'] = $answerId;
+                $dataToSave['is_correct'] = $isCorrect;
+                break;
+
+            case 'multiple_answer':
+                $answerIds = $request->input('answer_ids', []);
+
+                if (!empty($answerIds)) {
+                    $correctAnswerIds = $question->answerOptions()
+                        ->where('is_correct', 1)
+                        ->pluck('id')
+                        ->toArray();
+
+                    sort($answerIds);
+                    sort($correctAnswerIds);
+                    $isCorrect = ($answerIds === $correctAnswerIds);
+                }
+
+                $dataToSave['selected_answer_ids'] = $answerIds;
+                $dataToSave['is_correct'] = $isCorrect;
+                break;
+
+            case 'fill_blank':
+                $textAnswer = trim($request->input('text_answer', ''));
+
+                if ($textAnswer !== '') {
+                    $correctAnswers = $question->answerOptions()
+                        ->where('is_correct', 1)
+                        ->get();
+
+                    // Kiểm tra với tất cả các đáp án đúng (có thể có nhiều cách trả lời)
+                    foreach ($correctAnswers as $correctAnswer) {
+                        $correctText = trim($correctAnswer->answer_text);
+
+                        // So sánh không phân biệt hoa thường và loại bỏ khoảng trắng thừa
+                        if (mb_strtolower($textAnswer) === mb_strtolower($correctText)) {
+                            $isCorrect = true;
+                            break;
+                        }
+                    }
+                }
+                $dataToSave['text_answer'] = $textAnswer;
+                $dataToSave['is_correct'] = $isCorrect;
+                break;
         }
 
-        // Lưu hoặc cập nhật câu trả lời
         StudentAnswer::updateOrCreate(
             [
                 'exam_session_id' => $sessionId,
-                'question_id' => $request->question_id
+                'question_id' => $questionId
             ],
-            [
-                'selected_answer_id' => $request->answer_id,
-                'is_correct' => $isCorrect
-            ]
+            $dataToSave
         );
 
         return response()->json([
@@ -178,7 +247,7 @@ class StudentExamController extends Controller
     {
         $studentId = Auth::id();
 
-        $examSession = ExamSession::with(['exam.questions.answerOptions'])
+        $examSession = ExamSession::with(['exam.questions.answerOptions', 'exam.questions.type'])
             ->where('id', $sessionId)
             ->where('student_id', $studentId)
             ->firstOrFail();
@@ -191,45 +260,100 @@ class StudentExamController extends Controller
             $wrongCount = 0;
             $totalQuestions = $examSession->exam->questions->count();
 
-            // Xóa các câu trả lời cũ (nếu có)
+            // Xóa các câu trả lời cũ
             StudentAnswer::where('exam_session_id', $sessionId)->delete();
 
             // Lưu câu trả lời và chấm điểm
             foreach ($examSession->exam->questions as $question) {
-                $selectedAnswerId = $answers[$question->id] ?? null;
+                $questionType = $question->type->name;
+                $answer = $answers[$question->id] ?? null;
                 $isCorrect = false;
 
-                if ($selectedAnswerId) {
-                    $isCorrect = $question->answerOptions()
-                        ->where('id', $selectedAnswerId)
-                        ->where('is_correct', 1)
-                        ->exists();
+                switch ($questionType) {
+                    case 'multiple_choice':
+                        $selectedAnswerId = $answer;
 
-                    if ($isCorrect) {
-                        $correctCount++;
-                    } else {
-                        $wrongCount++;
-                    }
+                        if ($selectedAnswerId) {
+                            $isCorrect = $question->answerOptions()
+                                ->where('id', $selectedAnswerId)
+                                ->where('is_correct', 1)
+                                ->exists();
+                        }
+
+                        StudentAnswer::create([
+                            'exam_session_id' => $sessionId,
+                            'question_id' => $question->id,
+                            'selected_answer_id' => $selectedAnswerId,
+                            'is_correct' => $isCorrect
+                        ]);
+                        break;
+
+                    case 'multiple_answer':
+                        $selectedAnswerIds = is_array($answer) ? $answer : [];
+
+                        // Chuyển đổi string sang integer
+                        $selectedAnswerIds = array_map('intval', $selectedAnswerIds);
+
+                        if (!empty($selectedAnswerIds)) {
+                            $correctAnswerIds = $question->answerOptions()
+                                ->where('is_correct', 1)
+                                ->pluck('id')
+                                ->map(fn($id) => (int) $id) // Đảm bảo kiểu integer
+                                ->toArray();
+
+                            sort($selectedAnswerIds);
+                            sort($correctAnswerIds);
+                            $isCorrect = ($selectedAnswerIds === $correctAnswerIds);
+                        }
+
+                        StudentAnswer::create([
+                            'exam_session_id' => $sessionId,
+                            'question_id' => $question->id,
+                            'selected_answer_ids' => $selectedAnswerIds,
+                            'is_correct' => $isCorrect
+                        ]);
+                        break;
+
+                    case 'fill_blank':
+                        $textAnswer = is_string($answer) ? trim($answer) : '';
+
+                        if ($textAnswer !== '') {
+                            $correctAnswers = $question->answerOptions()
+                                ->where('is_correct', 1)
+                                ->get();
+
+                            // Kiểm tra với tất cả các đáp án đúng
+                            foreach ($correctAnswers as $correctAnswer) {
+                                $correctText = trim($correctAnswer->answer_text);
+
+                                if (mb_strtolower($textAnswer) === mb_strtolower($correctText)) {
+                                    $isCorrect = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        StudentAnswer::create([
+                            'exam_session_id' => $sessionId,
+                            'question_id' => $question->id,
+                            'text_answer' => $textAnswer,
+                            'is_correct' => $isCorrect
+                        ]);
+                        break;
+                }
+
+                if ($isCorrect) {
+                    $correctCount++;
                 } else {
                     $wrongCount++;
                 }
-
-                // Lưu câu trả lời vào bảng student_answers
-                StudentAnswer::create([
-                    'exam_session_id' => $sessionId,
-                    'question_id' => $question->id,
-                    'selected_answer_id' => $selectedAnswerId,
-                    'is_correct' => $isCorrect
-                ]);
             }
 
             // Tính điểm
             $score = $totalQuestions > 0 ? ($correctCount / $totalQuestions) * 10 : 0;
 
             // Cập nhật trạng thái session
-            $examSession->update([
-                'status' => 'completed'
-            ]);
+            $examSession->update(['status' => 'completed']);
 
             // Lưu kết quả
             $examSession->results()->create([
@@ -246,7 +370,7 @@ class StudentExamController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Có lỗi xảy ra khi nộp bài: ' . $e->getMessage());
+            return back()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
         }
     }
 

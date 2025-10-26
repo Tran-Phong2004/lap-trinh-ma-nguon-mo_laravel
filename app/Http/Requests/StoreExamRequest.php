@@ -30,7 +30,7 @@ class StoreExamRequest extends FormRequest
             'questions.*.is_active' => 'boolean',
 
             // Answer options
-            'questions.*.answers' => 'required|array|min:2',
+            'questions.*.answers' => 'required|array|min:1',
             'questions.*.answers.*.answer_text' => 'required|string',
             'questions.*.answers.*.is_correct' => 'nullable|boolean',
             'questions.*.correct_answer' => 'nullable|integer',

@@ -11,12 +11,14 @@ class StudentAnswer extends Model
         'exam_session_id',
         'question_id',
         'selected_answer_id',
+        'selected_answer_ids',
         'text_answer',
         'is_correct'
     ];
 
     protected $casts = [
         'is_correct' => 'boolean',
+        'selected_answer_ids' => 'array',
     ];
 
     /**
@@ -41,5 +43,14 @@ class StudentAnswer extends Model
     public function selectedAnswer(): BelongsTo
     {
         return $this->belongsTo(AnswerOption::class, 'selected_answer_id');
+    }
+
+    // Lấy nhiều đáp án cho multiple_answer
+    public function selectedAnswers()
+    {
+        if (!$this->selected_answer_ids) {
+            return collect([]);
+        }
+        return AnswerOption::whereIn('id', $this->selected_answer_ids)->get();
     }
 }
